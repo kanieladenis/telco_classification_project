@@ -1,35 +1,100 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 
-def clean_telco():
+# Create Function to Clean Data
+def clean_telco(df):
     '''
-    This function 
+    This function cleans telco data by dropping duplicated columns, filling in blanks for 
+    total charges, converts total_charge to float, creates dummy variables, and clean columns names."
     '''
-
-def prep_telco():
-    df = acquire.get_telco()
-    # id cols to drop
-    drop_cols = ['internet_service_type_id',
-             'internet_service_type_id.1',
-             'contract_type_id',
-             'contract_type_id.1',
-             'payment_type_id',
-             'payment_type_id.1']
-    # drop columns
-    df = df.drop(columns=drop_cols)
-    # replace blank spaces with zeros
+    
+    # dropping ducplicate columns
+    df = df.drop(columns=['payment_type_id', 'internet_service_type_id', 'contract_type_id'])
+    
+    #replace blanks in total_charges with 0
     df['total_charges'] = df.total_charges.replace(' ', '0')
-    # convert total charges from object to float
+    
+    # Convert total_charges to float
     df.total_charges = df.total_charges.astype(float)
-    # id columns for dummy variables
-    dummies_cols = [
+    
+    # Create new column for auto vs manual payment type
+    df['payment'] = np.where(df.payment_type.str.contains('auto'), 'auto', 'manual')
+    
+    # Replace senior citizen column values with yes and no to build dummy variables
+    df['senior_citizen'] = np.where(df.senior_citizen==1, 'yes', 'no')
+    
+    # Set Customer ID Column as Index to save for csv deliverable
+    df.set_index('customer_id', inplace=True)
+    
+    # Id columns for dummy variables
+    dummies_cols =[
+        'senior_citizen',
+        'gender',
+        'partner',
+        'dependents',
+        'phone_service',
+        'multiple_lines',
+        'online_security',
+        'online_backup',
+        'device_protection',
+        'tech_support',
+        'streaming_tv',
+        'streaming_movies',
+        'paperless_billing',
+        'churn',
+        'contract_type',
+        'internet_service_type',
+        'payment']
+    
+    # Create dummy variables for id'd columns
+    dummies_df = pd.get_dummies(df[dummies_cols], drop_first=False)
+    
+    # Concat dummy vairabls to df
+    df = pd.concat([df, dummies_df], axis=1)
+    
+    # Clean column names
+    df.columns = [col.lower().replace(' ','_').replace('-','_') for col in df]
+    
+    return df
+
+
+
+# Create function to split data
+def split_telco(df):
+    '''
+    This function splits the telco data into the train, validate, and test samples at 
+    portions: train= 56%, validate= 24%, test = 20%
+    '''
+    
+    # Split data to create test sample
+    train_validate, test = train_test_split(df, 
+                                             test_size=.2, 
+                                             random_state=123, 
+                                             stratify=df.churn)
+    
+    # Split data to create train and validate samples
+    train, validate = train_test_split(train_validate,
+                                      test_size=.3,
+                                      random_state=123,
+                                      stratify=train_validate.churn)
+    
+    return train, validate, test
+
+
+
+# create funciton to prep df for modleing
+def prep_telco(train, validate, test):
+    '''
+    This function prepares data for model ingest
+    '''
+    # drop uneeded columsn
+    drop_cols = [
  'gender',
- 'senior_citizen',
- 'partner',
+        'senior_citizen',
+'partner',
  'dependents',
- 'phone_service',
+'phone_service',
  'multiple_lines',
  'online_security',
  'online_backup',
@@ -38,81 +103,74 @@ def prep_telco():
  'streaming_tv',
  'streaming_movies',
  'paperless_billing',
- 'churn',
+'churn',
  'contract_type',
  'internet_service_type',
- 'payment_type']
-    # creaet dummy variables and assign to variable
-    dummies_df = pd.get_dummies(df[dummies_cols], drop_first=True)
-    # concat df with dummy variable columns
-    df = pd.concat([df, dummies_df], axis=1)
-    df.columns = [col.lower().replace('.','_') for col in df]
-    return df
-
-
-
-def split_telco(df):
-    '''
-    '''
-    train_validate, test = train_test_split(df, 
-                                             test_size=.2, 
-                                             random_state=123, 
-                                             stratify=df.churn)
-    train, validate = train_test_split(train_validate,
-                                      test_size=.3,
-                                      random_state=123,
-                                      stratify=train_validate.churn)
+ 'payment_type',
+ 'gender_female',
+ 'gender_male',
+'phone_service_no',
+ 'phone_service_yes',
+ 'multiple_lines_no',
+ 'multiple_lines_no_phone_service',
+ 'multiple_lines_yes',
+ 'online_backup_no',
+ 'online_backup_no_internet_service',
+ 'online_backup_yes',
+ 'device_protection_no',
+ 'device_protection_no_internet_service',
+ 'device_protection_yes',
+'streaming_tv_no',
+ 'streaming_tv_no_internet_service',
+ 'streaming_tv_yes',
+ 'streaming_movies_no',
+ 'streaming_movies_no_internet_service',
+ 'streaming_movies_yes',
+'monthly_charges',
+ 'total_charges',
+'partner_yes',
+ 'dependents_yes',
+'online_security_no_internet_service',
+'tech_support_no_internet_service',
+'paperless_billing_no',
+'churn_no',
+'contract_type_two_year',
+'internet_service_type_none',
+        'payment',
+ 'payment_auto',
+    'senior_citizen_yes']
+    
+    # Drop columns from train
+    train = train.drop(columns=drop_cols)
+    
+    # Drop columns from validate
+    validate = validate.drop(columns=drop_cols)
+    
+    # Drop columns from test
+    test = test.drop(columns=drop_cols)
+    
     return train, validate, test
 
-
-
-
-
-
-
-
-
-
-
-
-def clean_telco(df):
+# Create X and y version
+def xy_version(train,validate,test):
     '''
-    This function takes in dataframe as argument, 
-    create dummy variables out of sex and embarked, and concats those to original dataframe
-    drops columns embarked, sex, deck, class
-    drops rows where age (177 rows) or embarked_town (2 rows) are null. 
-    it returns the new cleaned dataframe.
+    This function creats the x and y version of train, validate, and test data samples
     '''
-    dummies_df = pd.get_dummies(df[['sex', 'embarked']], drop_first=True)
-    df_with_dummies = pd.concat([df, dummies_df], axis=1)
-    df_dropped_cols_with_dummies = df_with_dummies.drop(columns=['embarked', 'sex', 'deck', 'class'])
-    df_cleaned = df_dropped_cols_with_dummies[df_dropped_cols_with_dummies.age.notnull()]
-    return df_cleaned
+    
+    # Create x and y versions of train data
+    X_train = train.drop(columns=['churn_yes'])
+    y_train = train.churn_yes
+    
+    # Create x and y versions of validate data
+    X_validate = validate.drop(columns=['churn_yes'])
+    y_validate = validate.churn_yes
 
-
-def train_validate_test_split(prepped_df, seed=123):
-    '''
-    This function takes in a cleaned dataframe and a random seed, 
-    and splits the dataframe into 3 samples, a train, validate and test sample, 
-    The test is 20% of the data, the validate is 24% of the data, and the train is 56% of the data. 
-    The function returns 3 dataframes in the order of: train, validate and test. 
-    '''
-    train_and_validate, test = train_test_split(
-        prepped_df, test_size=0.2, random_state=seed, stratify=prepped_df.survived
-    )
-    train, validate = train_test_split(
-        train_and_validate,
-        test_size=0.3,
-        random_state=seed,
-        stratify=train_and_validate.survived,
-    )
-    return train, validate, test
-
-def clean_split_titanic_data(df):
-    '''
-    this function runs both the clean_titanic and train_validate_test_split functions, initially taking in the orginal
-    acquired dataframe as an argument and returning the 3 samples in order: train, validate, test. 
-    '''
-    cleaned_df = clean_titanic(df)
-    train, validate, test = train_validate_test_split(cleaned_df, seed=123)
-    return train, validate, test
+    # Create x and y versions of test data
+    X_test = test.drop(columns=['churn_yes'])
+    y_test = test.churn_yes
+    
+    return X_train, y_train, X_validate, y_validate, X_test, y_test
+    
+    
+    
+    
